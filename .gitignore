@@ -13,6 +13,7 @@ frontend/dist/
 data/*
 !data/.gitkeep
 models/*.task
+models/*.sha256
 *.log
 .coverage
 

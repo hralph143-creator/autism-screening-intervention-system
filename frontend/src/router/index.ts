@@ -15,7 +15,7 @@ const router = createRouter({
       path: '/', component: AppLayout, meta: { auth: true }, children: [
         { path: '', component: DashboardView, meta: { title: '系统首页' } },
         { path: 'children', component: ChildrenView, meta: { title: '儿童档案' } },
-        { path: 'analysis', component: PlaceholderView, meta: { title: '视频分析', description: '用于上传授权视频并提取客观行为特征。' } },
+        { path: 'analysis', component: () => import('../views/VideoAnalysisView.vue'), meta: { title: '视频分析' } },
         { path: 'observations', component: PlaceholderView, meta: { title: '行为观察', description: '用于填写和管理日常行为观察记录。' } },
         { path: 'activities', component: PlaceholderView, meta: { title: '家庭训练', description: '用于浏览家庭互动活动并记录执行情况。' } },
         { path: 'history', component: PlaceholderView, meta: { title: '历史记录', description: '用于统一查询各类历史记录。' } },

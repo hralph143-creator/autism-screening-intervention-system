@@ -1,148 +1,147 @@
 # 基于深度学习的自闭症筛查与干预系统
 
-这是一个面向儿童日常行为观察、早期筛查辅助和家庭互动管理的本地软件项目。当前仓库已完成**第二阶段：儿童档案管理与基础业务**。
+这是一个在 Windows 本机运行的儿童档案与视频客观特征分析系统。当前已完成第三阶段：在既有档案管理基础上，使用 MediaPipe Pose Landmarker 和 Face Landmarker 对经监护人授权的 MP4 视频进行本地分析。
 
-> 本系统定位为教学科研与辅助观察工具，不属于医疗诊断软件，不替代专业医生的诊断和治疗意见。
+> 系统只提供姿态/面部检测覆盖率、头部位置变化、上肢运动变化和数据质量摘要，不输出自闭症诊断、风险概率或医疗建议，也不能替代专业评估。
 
 ## 已完成功能
 
-- Vue 3、TypeScript、Vite、Element Plus、Vue Router 与 Axios 前端基础框架
-- FastAPI、SQLAlchemy、Pydantic 与 SQLite 后端基础框架
-- 首次管理员初始化、密码强度校验和防重复初始化
-- PBKDF2-SHA256 带盐密码哈希，不保存明文密码
-- 服务端会话、HttpOnly Cookie、登录校验与主动退出失效
-- 真实数据库健康检查与受保护的系统信息接口
-- 可折叠后台导航、系统首页、系统设置和五个有效占位路由
-- 匿名化儿童档案的创建、查询、修改、详情与删除
-- 后端自动生成唯一儿童编号，出生年月校验与年龄计算
-- 按编号或昵称搜索、分页和建档时间排序
-- 首页真实展示档案总数、本月新增和最近创建档案
-- 可重复执行的 `0002_create_children` 数据库迁移
-- `setup.bat`、`run.bat`、`check.bat` Windows 本地脚本
-- 后端自动化测试、前端类型检查和生产构建
+- Vue 3、TypeScript、Vite、Element Plus、ECharts 前端
+- FastAPI、SQLAlchemy、SQLite 后端与 HttpOnly Cookie 登录
+- 匿名化儿童档案 CRUD、搜索、分页与首页真实统计
+- MP4 上传与儿童档案关联，提交前强制确认监护人授权
+- 后端真实校验扩展名、MP4 文件头、大小、时长、分辨率、帧率、首尾可解码性
+- MediaPipe Tasks `VIDEO` 模式，CPU 单工作线程，约 2 帧/秒采样
+- Pose 与 Face 模型均使用官方 `.task` 文件并执行真实加载检查
+- `PENDING / RUNNING / COMPLETED / FAILED / INTERRUPTED` 完整任务状态
+- 服务重启时把遗留 `RUNNING` 任务标为可重试的 `INTERRUPTED`
+- 姿态与面部覆盖率、尺度归一化运动量、缺失段和多人歧义处理
+- 3–5 张可用检测结果帧、ECharts 趋势图、任务筛选、失败重试与安全删除
+- 受登录保护的列表、结果和结果帧接口；视频使用 UUID 文件名保存
+- `0002_create_children` 与 `0003_create_video_analyses` 增量迁移，不清空旧数据
+- 自动化测试、真实模型加载验证和实际视频验证脚本
 
-视频分析、行为观察、家庭训练和历史报告尚未开发。它们当前只有明确标注的占位页面，不包含模拟数据或无效按钮。
+行为观察、家庭训练和综合历史报告仍是后续阶段，本阶段没有提前实现或伪造数据。
 
-## 技术与环境
+## 环境
 
 - Windows 10/11 64 位
-- Python 3.11 或 3.12（优先 3.12）
+- Python 3.11 或 3.12
 - Node.js 20 或更高版本
 - npm 10 或更高版本
+- 纯 CPU 可运行，不依赖 CUDA、PyTorch、TensorFlow、Redis 或外部任务队列
 
-本阶段不安装 PyTorch、TensorFlow、MediaPipe、OpenCV、Redis 或任务队列。
+已核验的视频依赖版本：MediaPipe `0.10.32`、OpenCV contrib `4.12.0.88`、NumPy `2.2.6`。模型来自 Google MediaPipe 官方存储地址。
 
 ## 首次安装
 
-在项目根目录双击：
+在项目根目录双击 `setup.bat`。脚本会：
 
-```text
-setup.bat
+1. 检查 Python、Node.js 与 npm；
+2. 创建 `.venv` 并安装前后端依赖；
+3. 下载官方 Pose Lite 与 Face Landmarker 模型，记录 SHA-256，并真实创建模型实例；
+4. 初始化 SQLite 并依次执行增量迁移；
+5. 检查依赖、数据库、模型和前端类型。
+
+模型也可独立下载或修复：
+
+```powershell
+.venv\Scripts\python.exe scripts\download_models.py
 ```
 
-脚本会检查 Python、Node.js 和 npm，创建 `.venv`，安装依赖，创建 `data/app.db`，初始化基础数据表并执行前端类型检查。任何步骤失败都会显示具体错误并保留窗口。
+模型缺失时，档案等既有页面仍可使用；视频页面会明确显示不可用原因，上传接口返回 `503`，不会伪装为分析成功。
 
-## 启动系统
+## 启动与检查
 
-完成初始化后双击：
-
-```text
-run.bat
-```
-
-脚本会先检查依赖和端口，再分别启动后端和前端。只有在实际访问两个服务成功后才打开浏览器。
+双击 `run.bat` 启动前后端。脚本确认两个服务可访问后才打开浏览器。
 
 - 前端：<http://127.0.0.1:5173>
 - 后端：<http://127.0.0.1:8001>
 - API 文档：<http://127.0.0.1:8001/docs>
 
-首次访问会显示管理员初始化表单。系统不提供默认账号或密码。
+双击 `check.bat` 可检查运行环境、数据库表、模型真实加载状态及已启动的服务。
 
-## 环境检查
+## 视频处理边界
 
-双击：
+- 仅支持 `.mp4`，最大 100 MB，最长 120 秒。
+- 文件与结果保存在本机，不由本项目上传到云端。
+- 同一儿童、同一文件内容已有等待中/运行中/已完成任务时会拒绝重复提交。
+- 每个分析任务创建独立模型实例，避免跨线程共享跟踪状态。
+- MediaPipe 视频时间戳严格递增；关键点缺失、多人/多面孔帧不拼接成单人轨迹。
+- 运动量使用肩部—髋部躯干尺度归一化；不可信的大幅跳变保留为缺失，趋势图不跨缺失段连线。
+- 无人、面部不可见或有效帧太少时，任务仍可完成，但明确显示“有效数据不足”。
+- 上传成功只表示文件保存并入队，只有 `COMPLETED` 才表示分析成功。
+
+## 数据目录
 
 ```text
-check.bat
+data/
+  app.db                  SQLite 数据库
+  uploads/                UUID 命名的原视频
+  analysis_results/<id>/  带关键点的结果帧
+models/
+  pose_landmarker_lite.task
+  face_landmarker.task
 ```
 
-脚本会检查版本、虚拟环境、依赖、数据库文件与表结构，并在服务已启动时检查前后端地址。检查结束后窗口会保留。
+以上运行数据与模型文件均被 Git 忽略。删除一个已结束的分析任务时，会同时删除其原视频、结果帧和数据库记录。等待或运行中的任务不能删除。
 
-## 后端接口
+## 主要接口
 
-| 方法 | 地址 | 说明 | 是否需登录 |
-|---|---|---|---|
-| GET | `/api/health` | 服务与 SQLite 真实健康检查 | 否 |
-| GET | `/api/auth/status` | 管理员初始化状态 | 否 |
-| POST | `/api/auth/initialize` | 首次创建单一管理员 | 否，仅首次 |
-| POST | `/api/auth/login` | 管理员登录 | 否 |
-| GET | `/api/auth/me` | 查询当前管理员 | 是 |
-| POST | `/api/auth/logout` | 注销并使服务端会话失效 | 否 |
-| GET | `/api/system/info` | 非敏感系统运行信息 | 是 |
-| GET | `/api/children` | 档案搜索、分页与排序 | 是 |
-| POST | `/api/children` | 创建儿童档案 | 是 |
-| GET | `/api/children/{id}` | 获取档案详情 | 是 |
-| PUT | `/api/children/{id}` | 更新档案 | 是 |
-| DELETE | `/api/children/{id}` | 删除档案 | 是 |
-| GET | `/api/dashboard/stats` | 首页真实档案统计 | 是 |
+除健康检查和认证接口外，以下接口均需登录：
 
-## 数据存储与安全
+| 方法 | 地址 | 说明 |
+|---|---|---|
+| GET | `/api/models/status` | 检查模型文件并真实加载 |
+| GET | `/api/video-analyses` | 分页并按儿童/状态筛选任务 |
+| POST | `/api/video-analyses` | 授权确认、上传校验并入队 |
+| GET | `/api/video-analyses/{id}` | 查询状态与进度 |
+| GET | `/api/video-analyses/{id}/status` | 查询状态与进度（显式别名） |
+| GET | `/api/video-analyses/{id}/result` | 获取已完成的客观结果 |
+| GET | `/api/video-analyses/{id}/frames/{filename}` | 受保护地读取结果帧 |
+| POST | `/api/video-analyses/{id}/retry` | 重试失败或中断任务 |
+| DELETE | `/api/video-analyses/{id}` | 删除已结束任务和文件 |
 
-- 数据库：`data/app.db`
-- 业务表：`children`；基础表：`users`、`auth_sessions`
-- 迁移记录：`schema_migrations`
-- 运行数据不会提交到 Git。
-- 密码采用 PBKDF2-SHA256、随机盐和 310,000 次迭代保存。
-- 浏览器仅保存 HttpOnly 会话 Cookie，前端 JavaScript 无法读取会话令牌。
-- 会话令牌在数据库中只保存 SHA-256 摘要，退出后立即删除。
-- 后端与前端默认只监听 `127.0.0.1`，不对公网开放。
+儿童档案接口仍位于 `/api/children`，首页统计位于 `/api/dashboard/stats`。
 
-本地运行并不等于绝对安全。请保护好电脑账户和磁盘数据，并避免在公共电脑保存敏感信息。
-
-## 手动开发命令
-
-后端：
+## 开发与验证
 
 ```powershell
-.venv\Scripts\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8001 --reload --no-access-log
-```
-
-前端：
-
-```powershell
-cd frontend
-npm run dev
-```
-
-测试：
-
-```powershell
+# 后端测试（含上传校验、缺失模型、重复提交、队列成功/失败/中断、鉴权）
 .venv\Scripts\python.exe -m pytest backend\tests -q
-cd frontend
-npm run typecheck
-npm run build
+
+# 前端检查与生产构建
+npm --prefix frontend run typecheck
+npm --prefix frontend run build
+
+# 模型真实加载
+.venv\Scripts\python.exe scripts\check_models.py
+
+# 使用官方或已授权的人像帧验证 VIDEO 模式面部关键点
+.venv\Scripts\python.exe scripts\verify_face_model.py "D:\path\authorized-portrait.jpg"
+
+# 使用自备且已授权的实际 MP4 验证真实推理，不写业务数据库
+.venv\Scripts\python.exe scripts\verify_actual_analysis.py "D:\path\authorized-video.mp4"
 ```
+
+自动化测试中的队列推理会使用可控替身来稳定覆盖状态机；`check_models.py` 与 `verify_actual_analysis.py` 则明确执行真实 MediaPipe 模型，二者不会混为一谈。
 
 ## 配置
 
-后端配置集中在 `backend/app/core/config.py`，支持以下环境变量：
+配置集中在 `backend/app/core/config.py`：
 
-- `APP_ENV`：运行模式，默认 `development`
-- `APP_HOST`：后端监听地址，默认 `127.0.0.1`
-- `APP_PORT`：后端端口，默认 `8001`
-- `APP_DATA_DIR`：数据目录，默认项目根目录下的 `data`
-- `FRONTEND_ORIGINS`：允许跨域访问的前端地址
-- `LOG_LEVEL`：日志级别，默认 `INFO`
+- `APP_ENV`、`APP_HOST`、`APP_PORT`、`LOG_LEVEL`
+- `APP_DATA_DIR`：数据库、上传和结果目录的根目录
+- `APP_MODEL_DIR`：模型目录
+- `FRONTEND_ORIGINS`：允许的前端来源
+- `MAX_VIDEO_BYTES`：默认 100 MB
+- `MAX_VIDEO_SECONDS`：默认 120 秒
+- `ANALYSIS_SAMPLE_FPS`：默认 2 帧/秒
 
-接口不会返回数据库路径、会话令牌、密码哈希或其他敏感配置。
+## 隐私与限制
 
-## 常见问题
-
-- **端口被占用**：关闭占用 8001 或 5173 端口的程序，然后重新运行 `run.bat`。
-- **首次页面无法连接后端**：运行 `check.bat`，查看后端依赖、数据库和接口检查结果。
-- **数据库无法创建**：确认当前用户对项目目录具有写入权限。
-- **忘记管理员密码**：第一阶段未提供密码找回。请先备份数据；不要直接修改数据库中的密码哈希。
-
-## 后续阶段衔接
-
-第三阶段的视频分析可以通过 `children.id` 建立外键关联，并复用现有配置、数据库会话、认证依赖、统一请求封装、受保护路由和后台布局。新增业务表必须继续使用版本化迁移，不直接破坏已有 `users`、`auth_sessions` 与 `children` 数据。
+- 请只处理已获得明确授权的视频，避免录入真实姓名等不必要信息。
+- 本机保存不等于绝对安全；应保护 Windows 账户、磁盘和项目目录权限。
+- 当前队列是进程内单工作线程，适合毕业设计和单机轻量使用，不适合多机并发生产环境。
+- Pose/Face 的有效率会受遮挡、距离、光照、镜头角度和多人画面影响。
+- 本阶段没有模型训练、疾病分类或临床有效性验证。

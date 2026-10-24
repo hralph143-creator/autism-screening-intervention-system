@@ -1,13 +1,16 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..core.database import get_db
 from ..core.security import get_current_user
 from ..models.child import Child
+from ..models.video_analysis import VideoAnalysis
 from ..schemas.child import ChildCreate, ChildListResponse, ChildResponse, ChildUpdate
 from ..services.children import child_to_dict, create_child, delete_child, list_children, update_child
+from ..services.video_storage import remove_analysis_files
 
 router = APIRouter(prefix="/children", tags=["儿童档案"], dependencies=[Depends(get_current_user)])
 
@@ -50,5 +53,10 @@ def children_update(child_id: int, body: ChildUpdate, db: Session = Depends(get_
 @router.delete("/{child_id}")
 def children_delete(child_id: int, db: Session = Depends(get_db)) -> dict:
     child = get_child_or_404(child_id, db)
+    analyses = db.scalars(select(VideoAnalysis).where(VideoAnalysis.child_id == child_id)).all()
+    if any(item.status in ("PENDING", "RUNNING") for item in analyses):
+        raise HTTPException(status.HTTP_409_CONFLICT, "该档案存在等待或运行中的视频任务，请等待任务结束后再删除")
+    for item in analyses:
+        remove_analysis_files(item)
     delete_child(db, child)
     return {"message": "儿童档案已删除"}

@@ -5,6 +5,7 @@ set PYTHONUTF8=1
 pushd "%~dp0"
 if not exist ".venv\Scripts\python.exe" (echo [失败] Python 虚拟环境不存在，请先运行 setup.bat。& goto :fail)
 if not exist "frontend\node_modules" (echo [失败] 前端依赖不存在，请先运行 setup.bat。& goto :fail)
+call ".venv\Scripts\python.exe" "scripts\check_models.py" --quick >nul 2>&1 || echo [提示] 视频模型未就绪，档案等功能仍可使用；请运行 scripts\download_models.py 修复视频分析。
 netstat -ano | findstr /R /C:":8001 .*LISTENING" >nul && (echo [失败] 后端端口 8001 已被占用。& goto :fail)
 netstat -ano | findstr /R /C:":5173 .*LISTENING" >nul && (echo [失败] 前端端口 5173 已被占用。& goto :fail)
 echo 正在启动后端服务...

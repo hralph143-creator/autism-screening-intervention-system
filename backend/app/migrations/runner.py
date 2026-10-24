@@ -1,11 +1,12 @@
 from sqlalchemy import Engine, text
 
-MIGRATION_VERSION = "0002_create_children"
+MIGRATIONS = ("0002_create_children", "0003_create_video_analyses")
 
 
 def run_migrations(target_engine: Engine) -> None:
     """以可重复、事务化方式升级已有数据库，不删除任何已有表或数据。"""
     from ..models.child import Child
+    from ..models.video_analysis import VideoAnalysis
 
     with target_engine.begin() as connection:
         connection.execute(
@@ -18,15 +19,12 @@ def run_migrations(target_engine: Engine) -> None:
                 """
             )
         )
-        applied = connection.scalar(
-            text("SELECT version FROM schema_migrations WHERE version = :version"),
-            {"version": MIGRATION_VERSION},
-        )
-        if applied:
-            return
-        Child.__table__.create(bind=connection, checkfirst=True)
-        connection.execute(
-            text("INSERT INTO schema_migrations (version) VALUES (:version)"),
-            {"version": MIGRATION_VERSION},
-        )
-
+        tables = {MIGRATIONS[0]: Child.__table__, MIGRATIONS[1]: VideoAnalysis.__table__}
+        for version in MIGRATIONS:
+            applied = connection.scalar(
+                text("SELECT version FROM schema_migrations WHERE version = :version"), {"version": version}
+            )
+            if applied:
+                continue
+            tables[version].create(bind=connection, checkfirst=True)
+            connection.execute(text("INSERT INTO schema_migrations (version) VALUES (:version)"), {"version": version})
