@@ -1,0 +1,23 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# Runtime and sensitive local data
+data/*
+!data/.gitkeep
+models/*.task
+*.log
+.coverage
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
