@@ -15,18 +15,22 @@ from backend.app.models.child import Child
 from backend.app.models.user import AuthSession, User
 from backend.app.models.video_analysis import VideoAnalysis
 from backend.app.models.observation import ObservationRecord
+from backend.app.models.activity import Activity, ActivityRecord
 
 
 @pytest.fixture(autouse=True)
 def clean_database():
     initialize_database()
     with SessionLocal() as db:
+        db.execute(delete(ActivityRecord))
         db.execute(delete(ObservationRecord))
         db.execute(delete(VideoAnalysis))
         db.execute(delete(Child))
+        db.execute(delete(Activity))
         db.execute(delete(AuthSession))
         db.execute(delete(User))
         db.commit()
+    initialize_database()
     yield
 
 

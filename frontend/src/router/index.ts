@@ -17,7 +17,7 @@ const router = createRouter({
         { path: 'children', component: ChildrenView, meta: { title: '儿童档案' } },
         { path: 'analysis', component: () => import('../views/VideoAnalysisView.vue'), meta: { title: '视频分析' } },
         { path: 'observations', component: () => import('../views/ObservationsView.vue'), meta: { title: '行为观察' } },
-        { path: 'activities', component: PlaceholderView, meta: { title: '家庭训练', description: '用于浏览家庭互动活动并记录执行情况。' } },
+        { path: 'activities', component: () => import('../views/ActivitiesView.vue'), meta: { title: '家庭互动活动' } },
         { path: 'history', component: PlaceholderView, meta: { title: '历史记录', description: '用于统一查询各类历史记录。' } },
         { path: 'settings', component: SettingsView, meta: { title: '系统设置' } },
       ],

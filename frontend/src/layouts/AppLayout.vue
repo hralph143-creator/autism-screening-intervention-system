@@ -9,7 +9,7 @@ const route = useRoute(); const router = useRouter(); const collapsed = ref(fals
 const pageTitle = computed(() => String(route.meta.title || '系统'))
 const items = [
   ['/', '系统首页', '首'], ['/children', '儿童档案', '档'], ['/analysis', '视频分析', '视'],
-  ['/observations', '行为观察', '观'], ['/activities', '家庭训练', '训'], ['/history', '历史记录', '历'],
+  ['/observations', '行为观察', '观'], ['/activities', '家庭互动', '训'], ['/history', '历史记录', '历'],
   ['/settings', '系统设置', '设'],
 ]
 async function logout() {

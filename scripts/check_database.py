@@ -10,10 +10,24 @@ from backend.app.core.database import check_database, engine
 
 check_database()
 tables = set(inspect(engine).get_table_names())
-missing = {"users", "auth_sessions", "children", "video_analyses", "observation_records", "schema_migrations"} - tables
+missing = {
+    "users",
+    "auth_sessions",
+    "children",
+    "video_analyses",
+    "observation_records",
+    "activities",
+    "activity_records",
+    "schema_migrations",
+} - tables
 if missing:
     raise SystemExit(f"缺少数据表：{', '.join(sorted(missing))}")
-expected_migrations = {"0002_create_children", "0003_create_video_analyses", "0004_create_observation_records"}
+expected_migrations = {
+    "0002_create_children",
+    "0003_create_video_analyses",
+    "0004_create_observation_records",
+    "0005_create_activities_and_records",
+}
 with engine.connect() as connection:
     applied_migrations = {row[0] for row in connection.execute(text("SELECT version FROM schema_migrations"))}
 missing_migrations = expected_migrations - applied_migrations

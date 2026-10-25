@@ -11,8 +11,11 @@ from ..models.child import Child
 from ..models.video_analysis import VideoAnalysis
 from ..schemas.child import ChildCreate, ChildListResponse, ChildResponse, ChildUpdate
 from ..schemas.observation import ObservationListResponse
+from ..schemas.activity import ActivityRecordListResponse
 from ..services.children import child_to_dict, create_child, delete_child, list_children, update_child
 from ..services.observations import observation_to_dict, query_observations
+from ..services.activities import query_records, record_to_dict
+from ..services.builtin_activities import ACTIVITY_CATEGORIES
 from ..services.video_storage import remove_analysis_files
 
 router = APIRouter(prefix="/children", tags=["儿童档案"], dependencies=[Depends(get_current_user)])
@@ -61,6 +64,25 @@ def child_observations(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "开始日期不能晚于结束日期")
     records, total = query_observations(db, child_id, date_from, date_to, page, page_size)
     return {"items": [observation_to_dict(item, db) for item in records], "total": total, "page": page, "page_size": page_size}
+
+
+@router.get("/{child_id}/activity-records", response_model=ActivityRecordListResponse)
+def child_activity_records(
+    child_id: int,
+    category: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> dict:
+    get_child_or_404(child_id, db)
+    if category and category not in ACTIVITY_CATEGORIES:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "活动分类不在允许范围内")
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "开始日期不能晚于结束日期")
+    records, total = query_records(db, child_id, category, date_from, date_to, page, page_size)
+    return {"items": [record_to_dict(item, db) for item in records], "total": total, "page": page, "page_size": page_size}
 
 
 @router.put("/{child_id}", response_model=ChildResponse)
