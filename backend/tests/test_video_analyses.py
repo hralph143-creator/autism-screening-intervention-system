@@ -13,7 +13,7 @@ from backend.app.models.child import Child
 from backend.app.models.video_analysis import VideoAnalysis
 from backend.app.services.analysis_queue import analysis_queue
 from backend.app.services.model_manager import model_status
-from backend.app.services.video_analyzer import analyze_video
+from backend.app.services.video_analyzer import _quality_level, _sampling_plan, analyze_video
 from backend.app.services.video_files import inspect_video
 
 
@@ -37,6 +37,24 @@ def make_mp4(tmp_path: Path, seconds: float = 1.0) -> bytes:
 
 def ready_status(*_args, **_kwargs):
     return {"ready": True, "error": None}
+
+
+def test_short_video_sampling_is_adaptive():
+    frame_step, sampled_total, effective_fps = _sampling_plan(100, 76)
+    assert frame_step == 9
+    assert sampled_total == 9
+    assert effective_fps > settings.analysis_sample_fps
+
+    long_step, long_total, long_effective_fps = _sampling_plan(30, 300)
+    assert long_step == 15
+    assert long_total == 20
+    assert long_effective_fps == settings.analysis_sample_fps
+
+
+def test_quality_level_reports_partial_detection():
+    assert _quality_level(1.0, 0.0) == "部分数据可用"
+    assert _quality_level(0.8, 0.8) == "良好"
+    assert _quality_level(0.0, 0.0) == "有效数据不足"
 
 
 def test_video_routes_require_authentication(client):
@@ -217,5 +235,5 @@ def test_actual_models_handle_no_person_video_without_false_success(tmp_path):
     assert result["summary"]["quality_level"] == "有效数据不足"
     assert result["disclaimer"].startswith("本结果只描述")
     timestamps = [item["timestamp_ms"] for item in result["time_series"]]
-    assert len(timestamps) == 2
+    assert len(timestamps) == 10
     assert all(current > previous for previous, current in zip(timestamps, timestamps[1:]))

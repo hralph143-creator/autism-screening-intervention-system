@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import type { UploadFile } from 'element-plus'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import type { UploadFile, UploadFiles, UploadInstance, UploadProps, UploadRawFile, UploadUserFile } from 'element-plus'
+import { ElMessage, ElMessageBox, genFileId } from 'element-plus'
 import * as echarts from 'echarts'
 import { useRoute } from 'vue-router'
 import { api, messageOf } from '../api'
@@ -13,6 +13,7 @@ const children = ref<Child[]>([]); const rows = ref<Task[]>([]); const total = r
 const route = useRoute()
 const page = ref(1); const pageSize = ref(10); const filterChild = ref<number|null>(null); const filterStatus = ref('')
 const childId = ref<number|null>(null); const consent = ref(false); const selectedFile = ref<File|null>(null)
+const uploadRef = ref<UploadInstance>(); const fileList = ref<UploadUserFile[]>([])
 const uploading = ref(false); const uploadProgress = ref(0); const model = ref<any>(null); const modelLoading = ref(false)
 const detailOpen = ref(false); const detail = ref<any>(null); const resultLoading = ref(false); const chartEl = ref<HTMLDivElement>(); let chart: echarts.ECharts|null = null; let pollTimer:number|undefined
 
@@ -37,18 +38,49 @@ async function loadTasks(silent=false) {
   } catch (error) { if (!silent) ElMessage.error(messageOf(error)) }
   finally { loading.value = false }
 }
-function chooseFile(file:UploadFile) { selectedFile.value = file.raw || null }
-function removeFile() { selectedFile.value = null }
+function warning(message:string) { ElMessage.warning({ message, grouping:true }) }
+function clearSelectedFile() {
+  selectedFile.value = null
+  fileList.value = []
+  uploadRef.value?.clearFiles()
+}
+function chooseFile(file:UploadFile, files:UploadFiles) {
+  const raw = file.raw
+  if (!raw || !raw.name.toLowerCase().endsWith('.mp4')) {
+    clearSelectedFile()
+    warning('请选择扩展名为 .mp4 的视频文件')
+    return
+  }
+  selectedFile.value = raw
+  fileList.value = files.slice(-1)
+}
+function removeFile(_file:UploadFile, files:UploadFiles) {
+  fileList.value = files
+  selectedFile.value = files.at(-1)?.raw || null
+}
+const replaceFile:UploadProps['onExceed'] = files => {
+  clearSelectedFile()
+  const raw = files[0] as UploadRawFile|undefined
+  if (!raw) return
+  raw.uid = genFileId()
+  uploadRef.value?.handleStart(raw)
+}
 async function submit() {
-  if (!childId.value) return ElMessage.warning('请选择关联儿童档案')
-  if (!selectedFile.value) return ElMessage.warning('请选择 MP4 视频')
-  if (!consent.value) return ElMessage.warning('请先确认监护人授权与隐私说明')
-  const body = new FormData(); body.append('child_id', String(childId.value)); body.append('consent_confirmed', 'true'); body.append('file', selectedFile.value)
+  if (uploading.value) return
+  if (!childId.value) return warning('请选择关联儿童档案')
+  const raw = selectedFile.value || fileList.value.at(-1)?.raw
+  if (!raw) {
+    clearSelectedFile()
+    return warning('文件选择状态已失效，请重新选择 MP4 视频')
+  }
+  if (!raw.name.toLowerCase().endsWith('.mp4')) return warning('请选择扩展名为 .mp4 的视频文件')
+  if (!consent.value) return warning('请先确认监护人授权与隐私说明')
+  const body = new FormData(); body.append('child_id', String(childId.value)); body.append('consent_confirmed', 'true'); body.append('file', raw, raw.name)
   uploading.value = true; uploadProgress.value = 0
   try {
     const { data } = await api.post('/video-analyses', body, { timeout:180_000, onUploadProgress:event => { if (event.total) uploadProgress.value = Math.round(event.loaded / event.total * 100) } })
     ElMessage.success(`视频已安全保存，任务 #${data.id} 已进入本地分析队列`)
-    selectedFile.value = null; consent.value = false; page.value = 1; await loadTasks()
+    clearSelectedFile(); consent.value = false; page.value = 1; await loadTasks()
   } catch (error) { ElMessage.error(messageOf(error)) }
   finally { uploading.value = false }
 }
@@ -103,14 +135,14 @@ onBeforeUnmount(()=>{ if(pollTimer) clearInterval(pollTimer); window.removeEvent
     <section class="panel upload-panel">
       <h2>新建分析</h2><p class="hint">仅支持 MP4，最大 100 MB、120 秒。画面尽量稳定、明亮，并确保主体上半身和面部清晰可见。</p>
       <label>关联儿童档案</label><el-select v-model="childId" filterable placeholder="请选择儿童编号或档案昵称" style="width:100%"><el-option v-for="child in children" :key="child.id" :value="child.id" :label="`${child.child_code} · ${child.nickname}`"/></el-select>
-      <el-upload drag action="#" accept="video/mp4,.mp4" :auto-upload="false" :limit="1" :on-change="chooseFile" :on-remove="removeFile" class="video-upload"><div class="upload-copy"><b>拖放或点击选择 MP4 视频</b><span>选择后只显示文件名与大小，提交后由后端校验真实内容</span></div></el-upload>
+      <el-upload ref="uploadRef" v-model:file-list="fileList" drag action="#" accept="video/mp4,.mp4" :auto-upload="false" :limit="1" :on-change="chooseFile" :on-remove="removeFile" :on-exceed="replaceFile" class="video-upload"><div class="upload-copy"><b>拖放或点击选择 MP4 视频</b><span>重新选择会替换旧文件；提交后由后端校验真实内容</span></div></el-upload>
       <el-checkbox v-model="consent" class="consent">我确认已获得监护人对本次视频采集、保存和本地分析的明确授权，并已了解隐私用途。</el-checkbox>
       <el-progress v-if="uploading" :percentage="uploadProgress" :stroke-width="8"/>
-      <el-button type="primary" size="large" :loading="uploading" :disabled="!model?.ready" @click="submit">保存并开始本地分析</el-button>
+      <el-button type="primary" size="large" :loading="uploading" :disabled="!model?.ready || uploading" @click="submit">保存并开始本地分析</el-button>
       <p class="privacy">视频与结果保存在当前电脑的 data 目录。分析结果仅是客观运动特征摘要，不构成医学判断。</p>
     </section>
 
-    <section class="panel queue-panel"><h2>处理说明</h2><div class="flow"><div><b>1</b><span>后端验证格式、大小、时长和可解码性</span></div><div><b>2</b><span>单工作线程按约 2 帧/秒运行 Pose 与 Face Landmarker</span></div><div><b>3</b><span>结果关联到儿童档案，缺失帧不会被伪造或强行插值</span></div></div><el-alert type="info" :closable="false" title="上传成功只代表文件已保存；请以任务状态“已完成”为分析成功依据。"/></section>
+    <section class="panel queue-panel"><h2>处理说明</h2><div class="flow"><div><b>1</b><span>后端验证格式、大小、时长和可解码性</span></div><div><b>2</b><span>单工作线程通常按约 2 帧/秒分析，短视频会自适应增加采样帧</span></div><div><b>3</b><span>结果关联到儿童档案，缺失帧不会被伪造或强行插值</span></div></div><el-alert type="info" :closable="false" title="上传成功只代表文件已保存；请以任务状态“已完成”为分析成功依据。"/></section>
   </div>
 
   <section class="panel history-panel">
@@ -121,7 +153,7 @@ onBeforeUnmount(()=>{ if(pollTimer) clearInterval(pollTimer); window.removeEvent
 
   <el-drawer v-model="detailOpen" title="客观视频分析结果" size="min(920px, 94vw)" @closed="chart?.dispose()"><div v-loading="resultLoading"><template v-if="detail"><el-alert type="warning" :closable="false" :title="detail.result.disclaimer"/>
     <div class="result-meta"><b>{{ detail.analysis.child_code }} · {{ detail.analysis.child_nickname }}</b><span>{{ detail.analysis.original_filename }} · {{ detail.analysis.duration_seconds.toFixed(1) }} 秒</span></div>
-    <div class="metric-grid"><article><span>姿态有效帧率</span><b>{{ percent(detail.result.summary.pose_coverage) }}</b><small>{{ detail.result.summary.pose_valid_frames }}/{{ detail.result.summary.sampled_frames }} 帧</small></article><article><span>面部有效帧率</span><b>{{ percent(detail.result.summary.face_coverage) }}</b><small>{{ detail.result.summary.face_valid_frames }}/{{ detail.result.summary.sampled_frames }} 帧</small></article><article><span>数据质量</span><b>{{ detail.result.summary.quality_level }}</b><small>仅说明检测覆盖情况</small></article><article><span>处理耗时</span><b>{{ detail.result.summary.processing_seconds.toFixed(1) }} 秒</b><small>CPU · 约 2 帧/秒</small></article></div>
+    <div class="metric-grid"><article><span>姿态有效帧率</span><b>{{ percent(detail.result.summary.pose_coverage) }}</b><small>{{ detail.result.summary.pose_valid_frames }}/{{ detail.result.summary.sampled_frames }} 帧</small></article><article><span>面部有效帧率</span><b>{{ percent(detail.result.summary.face_coverage) }}</b><small>{{ detail.result.summary.face_valid_frames }}/{{ detail.result.summary.sampled_frames }} 帧</small></article><article><span>数据质量</span><b>{{ detail.result.summary.quality_level }}</b><small>仅说明检测覆盖情况</small></article><article><span>处理耗时</span><b>{{ detail.result.summary.processing_seconds.toFixed(1) }} 秒</b><small>CPU · 约 {{ detail.result.engine.sample_fps.toFixed(1) }} 帧/秒</small></article></div>
     <h3>运动变化趋势</h3><div ref="chartEl" class="chart"></div><p class="chart-note">纵轴是相邻有效采样帧的尺度归一化位移；断点表示关键点缺失、多人或不可信跳变，不进行跨段插值。</p>
     <div class="stats"><div><span>头部位置平均变化</span><b>{{ numberValue(detail.result.motion_statistics.head_location_change.mean) }}</b></div><div><span>上肢平均变化</span><b>{{ numberValue(detail.result.motion_statistics.upper_limb_change.mean) }}</b></div><div><span>面部中心平均变化</span><b>{{ numberValue(detail.result.motion_statistics.face_center_change.mean) }}</b></div></div>
     <template v-if="detail.result.preview_frames.length"><h3>关键结果帧</h3><div class="previews"><figure v-for="frame in detail.result.preview_frames" :key="frame.filename"><img :src="frameUrl(frame.filename)" alt="带检测关键点的视频采样帧"/><figcaption>{{ (frame.timestamp_ms/1000).toFixed(1) }} 秒</figcaption></figure></div></template>

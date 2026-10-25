@@ -68,7 +68,7 @@ function formatDate(value:string){ return new Date(value).toLocaleString('zh-CN'
 function videoLabel(video:Video){ const frames=video.sampled_frames==null?'':` · ${video.sampled_frames}帧`; return `#${video.id} ${video.original_filename} · ${videoStatus[video.status]||video.status}${frames}` }
 function openVideo(id:number){ detailOpen.value=false; void router.push({path:'/analysis',query:{task:String(id)}}) }
 
-onMounted(async()=>{ try{ await Promise.all([loadDefinition(),loadChildren()]); const queryChild=Number(route.query.child); if(Number.isInteger(queryChild)&&queryChild>0){ filterChild.value=queryChild } await load() }catch(reason){ error.value=messageOf(reason) } })
+onMounted(async()=>{ try{ await Promise.all([loadDefinition(),loadChildren()]); const queryChild=Number(route.query.child); if(Number.isInteger(queryChild)&&queryChild>0){ filterChild.value=queryChild } await load(); const recordId=Number(route.query.record); if(Number.isInteger(recordId)&&recordId>0) await viewRecord({id:recordId} as Observation) }catch(reason){ error.value=messageOf(reason) } })
 </script>
 
 <template>

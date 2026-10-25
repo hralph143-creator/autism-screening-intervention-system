@@ -18,6 +18,7 @@ POSE_CONNECTIONS = (
     (11, 23), (12, 24), (23, 24),
 )
 POSE_REQUIRED = (0, 11, 12, 13, 14, 15, 16, 23, 24)
+MIN_SHORT_VIDEO_SAMPLES = 8
 
 
 def _point(landmark) -> np.ndarray:
@@ -72,6 +73,27 @@ def _stats(values: list[float | None]) -> dict[str, float | int | None]:
     }
 
 
+def _sampling_plan(source_fps: float, frame_count: int) -> tuple[int, int, float]:
+    """Keep normal videos lightweight while giving short clips enough evidence."""
+    default_step = max(1, int(round(source_fps / settings.analysis_sample_fps)))
+    short_video_step = max(1, frame_count // MIN_SHORT_VIDEO_SAMPLES)
+    frame_step = min(default_step, short_video_step)
+    sampled_total = max(1, math.ceil(frame_count / frame_step))
+    effective_sample_fps = min(source_fps, source_fps / frame_step)
+    return frame_step, sampled_total, effective_sample_fps
+
+
+def _quality_level(pose_coverage: float, face_coverage: float) -> str:
+    minimum_coverage = min(pose_coverage, face_coverage)
+    if minimum_coverage >= 0.7:
+        return "良好"
+    if minimum_coverage >= 0.4:
+        return "可用"
+    if max(pose_coverage, face_coverage) >= 0.4:
+        return "部分数据可用"
+    return "有效数据不足"
+
+
 def _draw_preview(frame: np.ndarray, poses, faces) -> np.ndarray:
     output = frame.copy()
     height, width = output.shape[:2]
@@ -105,8 +127,7 @@ def analyze_video(
         raise RuntimeError("后台无法重新打开视频")
     source_fps = float(metadata["source_fps"])
     frame_count = int(metadata["frame_count"])
-    frame_step = max(1, int(round(source_fps / settings.analysis_sample_fps)))
-    sampled_total = max(1, math.ceil(frame_count / frame_step))
+    frame_step, sampled_total, effective_sample_fps = _sampling_plan(source_fps, frame_count)
     preview_targets = {round(index * (sampled_total - 1) / 4) for index in range(5)}
     series: list[dict] = []
     previews: list[dict] = []
@@ -171,8 +192,7 @@ def analyze_video(
     sampled = len(series)
     pose_coverage = pose_frames / sampled if sampled else 0
     face_coverage = face_frames / sampled if sampled else 0
-    minimum_coverage = min(pose_coverage, face_coverage)
-    quality_level = "良好" if minimum_coverage >= 0.7 else "可用" if minimum_coverage >= 0.4 else "有效数据不足"
+    quality_level = _quality_level(pose_coverage, face_coverage)
     warnings: list[str] = []
     if sampled == 0:
         warnings.append("未获得任何可分析帧")
@@ -188,7 +208,13 @@ def analyze_video(
     arm_values = [item["upper_limb_motion"] for item in series]
     face_values = [item["face_center_motion"] for item in series]
     return {
-        "engine": {"mediapipe_mode": "VIDEO", "device": "CPU", "sample_fps": settings.analysis_sample_fps},
+        "engine": {
+            "mediapipe_mode": "VIDEO",
+            "device": "CPU",
+            "sample_fps": round(effective_sample_fps, 3),
+            "configured_sample_fps": settings.analysis_sample_fps,
+            "adaptive_short_video_sampling": effective_sample_fps > settings.analysis_sample_fps,
+        },
         "summary": {
             "sampled_frames": sampled,
             "pose_valid_frames": pose_frames,

@@ -55,7 +55,7 @@ async function toggleActivity(item:Activity){try{await api.patch(`/activities/${
 function goObservations(){void router.push({path:'/observations',query:recordChild.value?{child:String(recordChild.value)}:{}})}
 function handleTabChange(value:string|number){if(value==='records')refreshRecords();if(value==='manage')void loadActivities(true)}
 
-onMounted(async()=>{try{await loadChildren();const child=Number(route.query.child);if(Number.isInteger(child)&&child>0){recordChild.value=child;tab.value='records'}await Promise.all([loadActivities(),loadActivities(true),loadRecords(),loadStats()])}catch(reason){ElMessage.error(messageOf(reason))}})
+onMounted(async()=>{try{await loadChildren();const child=Number(route.query.child);if(Number.isInteger(child)&&child>0){recordChild.value=child;tab.value='records'}await Promise.all([loadActivities(),loadActivities(true),loadRecords(),loadStats()]);const recordId=Number(route.query.record);if(Number.isInteger(recordId)&&recordId>0){tab.value='records';await showRecord({id:recordId} as RecordItem)}}catch(reason){ElMessage.error(messageOf(reason))}})
 </script>
 
 <template>

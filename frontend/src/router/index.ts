@@ -5,7 +5,6 @@ import LoginView from '../views/LoginView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import ChildrenView from '../views/ChildrenView.vue'
 import SettingsView from '../views/SettingsView.vue'
-import PlaceholderView from '../views/PlaceholderView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -18,7 +17,8 @@ const router = createRouter({
         { path: 'analysis', component: () => import('../views/VideoAnalysisView.vue'), meta: { title: '视频分析' } },
         { path: 'observations', component: () => import('../views/ObservationsView.vue'), meta: { title: '行为观察' } },
         { path: 'activities', component: () => import('../views/ActivitiesView.vue'), meta: { title: '家庭互动活动' } },
-        { path: 'history', component: PlaceholderView, meta: { title: '历史记录', description: '用于统一查询各类历史记录。' } },
+        { path: 'history', component: () => import('../views/HistoryView.vue'), meta: { title: '综合历史' } },
+        { path: 'history/report/:childId', component: () => import('../views/ReportView.vue'), meta: { title: '报告预览' } },
         { path: 'settings', component: SettingsView, meta: { title: '系统设置' } },
       ],
     },
