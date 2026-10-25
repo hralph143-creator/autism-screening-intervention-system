@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,7 +10,9 @@ from ..core.security import get_current_user
 from ..models.child import Child
 from ..models.video_analysis import VideoAnalysis
 from ..schemas.child import ChildCreate, ChildListResponse, ChildResponse, ChildUpdate
+from ..schemas.observation import ObservationListResponse
 from ..services.children import child_to_dict, create_child, delete_child, list_children, update_child
+from ..services.observations import observation_to_dict, query_observations
 from ..services.video_storage import remove_analysis_files
 
 router = APIRouter(prefix="/children", tags=["儿童档案"], dependencies=[Depends(get_current_user)])
@@ -42,6 +45,22 @@ def children_create(body: ChildCreate, db: Session = Depends(get_db)) -> dict:
 @router.get("/{child_id}", response_model=ChildResponse)
 def children_detail(child_id: int, db: Session = Depends(get_db)) -> dict:
     return child_to_dict(get_child_or_404(child_id, db))
+
+
+@router.get("/{child_id}/observations", response_model=ObservationListResponse)
+def child_observations(
+    child_id: int,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=10, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> dict:
+    get_child_or_404(child_id, db)
+    if date_from and date_to and date_from > date_to:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "开始日期不能晚于结束日期")
+    records, total = query_observations(db, child_id, date_from, date_to, page, page_size)
+    return {"items": [observation_to_dict(item, db) for item in records], "total": total, "page": page, "page_size": page_size}
 
 
 @router.put("/{child_id}", response_model=ChildResponse)

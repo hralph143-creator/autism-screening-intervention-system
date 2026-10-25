@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from .api import auth, children, dashboard, health, models, system, video_analyses
+from .api import auth, children, dashboard, health, models, observations, system, video_analyses
 from .core.config import settings
 from .core.database import initialize_database
 from .services.analysis_queue import analysis_queue
@@ -33,6 +33,7 @@ app.include_router(children.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(models.router, prefix="/api")
 app.include_router(video_analyses.router, prefix="/api")
+app.include_router(observations.router, prefix="/api")
 
 
 @app.exception_handler(RequestValidationError)

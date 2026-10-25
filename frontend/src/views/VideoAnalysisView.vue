@@ -3,12 +3,14 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { UploadFile } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
+import { useRoute } from 'vue-router'
 import { api, messageOf } from '../api'
 
 interface Child { id:number; child_code:string; nickname:string }
 interface Task { id:number; child_id:number; child_code:string; child_nickname:string; original_filename:string; file_size:number; duration_seconds:number; width:number; height:number; source_fps:number; status:string; progress:number; error_message:string|null; retry_count:number; created_at:string; completed_at:string|null }
 
 const children = ref<Child[]>([]); const rows = ref<Task[]>([]); const total = ref(0); const loading = ref(false)
+const route = useRoute()
 const page = ref(1); const pageSize = ref(10); const filterChild = ref<number|null>(null); const filterStatus = ref('')
 const childId = ref<number|null>(null); const consent = ref(false); const selectedFile = ref<File|null>(null)
 const uploading = ref(false); const uploadProgress = ref(0); const model = ref<any>(null); const modelLoading = ref(false)
@@ -88,7 +90,7 @@ function numberValue(value:number|null){ return value == null ? '数据不足' :
 function frameUrl(name:string){ return `/api/video-analyses/${detail.value.analysis.id}/frames/${encodeURIComponent(name)}` }
 function resize(){ chart?.resize() }
 
-onMounted(async()=>{ await Promise.all([loadModel(),loadChildren(),loadTasks()]); pollTimer=window.setInterval(()=>{ if(rows.value.some(item=>['PENDING','RUNNING'].includes(item.status))) void loadTasks(true) },1500); window.addEventListener('resize',resize) })
+onMounted(async()=>{ await Promise.all([loadModel(),loadChildren(),loadTasks()]); const taskId=Number(route.query.task); if(Number.isInteger(taskId)&&taskId>0){ try{ const task=(await api.get(`/video-analyses/${taskId}`)).data; if(task.status==='COMPLETED') await openResult(task); else ElMessage.info(`关联视频任务当前状态：${statusLabel[task.status]||task.status}`) }catch(error){ ElMessage.error(messageOf(error)) } } pollTimer=window.setInterval(()=>{ if(rows.value.some(item=>['PENDING','RUNNING'].includes(item.status))) void loadTasks(true) },1500); window.addEventListener('resize',resize) })
 onBeforeUnmount(()=>{ if(pollTimer) clearInterval(pollTimer); window.removeEventListener('resize',resize); chart?.dispose() })
 </script>
 

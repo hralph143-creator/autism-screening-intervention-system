@@ -37,6 +37,12 @@ def get_record_or_404(analysis_id: int, db: Session) -> VideoAnalysis:
 
 def serialize(record: VideoAnalysis, db: Session) -> dict:
     child = db.get(Child, record.child_id)
+    sampled_frames = None
+    if record.status == "COMPLETED" and record.result_json:
+        try:
+            sampled_frames = int(json.loads(record.result_json).get("summary", {}).get("sampled_frames"))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            pass
     return {
         "id": record.id,
         "child_id": record.child_id,
@@ -52,6 +58,7 @@ def serialize(record: VideoAnalysis, db: Session) -> dict:
         "progress": record.progress,
         "error_message": record.error_message,
         "retry_count": record.retry_count,
+        "sampled_frames": sampled_frames,
         "created_at": record.created_at,
         "started_at": record.started_at,
         "completed_at": record.completed_at,

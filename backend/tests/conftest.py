@@ -14,12 +14,14 @@ from backend.app.main import app
 from backend.app.models.child import Child
 from backend.app.models.user import AuthSession, User
 from backend.app.models.video_analysis import VideoAnalysis
+from backend.app.models.observation import ObservationRecord
 
 
 @pytest.fixture(autouse=True)
 def clean_database():
     initialize_database()
     with SessionLocal() as db:
+        db.execute(delete(ObservationRecord))
         db.execute(delete(VideoAnalysis))
         db.execute(delete(Child))
         db.execute(delete(AuthSession))

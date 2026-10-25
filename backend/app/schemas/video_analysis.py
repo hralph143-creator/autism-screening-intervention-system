@@ -19,6 +19,7 @@ class VideoAnalysisResponse(BaseModel):
     progress: int
     error_message: str | None
     retry_count: int
+    sampled_frames: int | None
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
