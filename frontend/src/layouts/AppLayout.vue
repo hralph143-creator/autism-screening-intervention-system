@@ -29,7 +29,7 @@ async function logout() {
 <template>
   <div class="shell" :class="{ collapsed }">
     <aside>
-      <div class="brand"><span class="brand-icon"><img src="/app-icon.png" alt="儿童行为观察系统图标"/></span><div><b>儿童行为观察</b><small>本地管理系统</small></div></div>
+      <div class="brand"><span class="brand-icon"><img src="/app-icon.png?v=2" alt="儿童行为观察系统图标"/></span><div><b>儿童行为观察</b><small>本地管理系统</small></div></div>
       <nav><button v-for="item in items" :key="item.path" :class="{ active: isActive(item.path) }" :title="collapsed ? item.label : undefined" @click="router.push(item.path)"><i><component :is="item.icon"/></i><em>{{ item.label }}</em></button></nav>
       <button class="collapse" :title="collapsed ? '展开导航' : '收起导航'" @click="collapsed = !collapsed"><i><component :is="collapsed ? Expand : Fold"/></i><span>{{ collapsed ? '展开导航' : '收起导航' }}</span></button>
     </aside>

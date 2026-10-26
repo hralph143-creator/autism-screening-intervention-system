@@ -74,7 +74,7 @@ function disableFutureMonth(value: Date) { return value.getTime() > Date.now() }
 onMounted(load)
 </script>
 <template>
-  <div class="page-head"><div><h1>儿童档案</h1><p>默认使用系统编号与化名管理，避免录入不必要的身份信息</p></div><el-button type="primary" @click="createRecord">新建档案</el-button></div>
+  <div class="page-head"><h1>儿童档案</h1><el-button type="primary" @click="createRecord">新建档案</el-button></div>
   <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" class="error-alert"><template #default><el-button link type="primary" @click="load">重新加载</el-button></template></el-alert>
   <div class="panel">
     <div class="toolbar"><el-input v-model="query" placeholder="搜索儿童编号或档案昵称" clearable maxlength="50" @keyup.enter="search" @clear="search"/><el-select v-model="sortOrder" @change="search"><el-option label="按建档时间降序" value="desc"/><el-option label="按建档时间升序" value="asc"/></el-select><el-button @click="search">查询</el-button></div>
