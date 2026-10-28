@@ -129,6 +129,9 @@ DEMO_SETS = (
     },
 )
 
+DEMO_DEVELOPMENT_NOTE = "演示数据：用于展示档案、视频、观察和家庭互动记录的完整流程，不对应真实儿童。"
+DEMO_GUARDIAN_NOTE = "演示数据，可在体验完成后删除。"
+
 
 def create_synthetic_video(target: Path, label: str) -> None:
     """生成不含真人、可明确识别为演示素材的短 MP4。"""
@@ -152,14 +155,22 @@ def create_synthetic_video(target: Path, label: str) -> None:
 def ensure_child(db, definition: dict) -> Child:
     child = db.scalar(select(Child).where(Child.child_code == definition["code"]))
     if child:
+        if (
+            child.nickname != definition["nickname"]
+            or child.development_notes != DEMO_DEVELOPMENT_NOTE
+            or child.guardian_notes != DEMO_GUARDIAN_NOTE
+        ):
+            raise RuntimeError(
+                f"儿童编号 {definition['code']} 已被非演示档案占用；为避免误关联，未写入任何关联记录。"
+            )
         return child
     child = Child(
         child_code=definition["code"],
         nickname=definition["nickname"],
         birth_month=definition["birth_month"],
         gender=definition["gender"],
-        development_notes="演示数据：用于展示档案、视频、观察和家庭互动记录的完整流程，不对应真实儿童。",
-        guardian_notes="演示数据，可在体验完成后删除。",
+        development_notes=DEMO_DEVELOPMENT_NOTE,
+        guardian_notes=DEMO_GUARDIAN_NOTE,
     )
     db.add(child)
     db.commit()
@@ -173,15 +184,14 @@ def ensure_video(db, child: Child, set_number: int, temp_dir: Path, history_offs
         select(VideoAnalysis).where(
             VideoAnalysis.child_id == child.id,
             VideoAnalysis.original_filename == original_name,
-            VideoAnalysis.status == "COMPLETED",
         )
     )
     demo_time = datetime.utcnow() - timedelta(days=history_offset_days)
     if existing:
-        existing.created_at = demo_time
-        existing.started_at = demo_time
-        existing.completed_at = demo_time
-        db.commit()
+        if existing.status != "COMPLETED":
+            raise RuntimeError(
+                f"演示视频记录 #{existing.id} 状态为 {existing.status}；为避免生成重复记录，请先检查该任务。"
+            )
         return existing
 
     source = temp_dir / f"demo_{set_number}.mp4"
@@ -275,24 +285,25 @@ def ensure_activity_records(db, child: Child, definition: dict, set_number: int)
         activity = db.scalar(select(Activity).where(Activity.activity_code == code))
         if not activity:
             raise RuntimeError(f"缺少内置活动：{code}")
-        activity_date = date.today() - timedelta(days=definition["history_offset_days"] + index * 9)
+        response_marker = f"演示数据集{set_number}：用于展示“{activity.name}”活动记录流程，不对应真实儿童表现。"
         existing = db.scalar(
             select(ActivityRecord).where(
                 ActivityRecord.child_id == child.id,
                 ActivityRecord.activity_id == activity.id,
-                ActivityRecord.activity_date == activity_date,
+                ActivityRecord.child_response == response_marker,
             )
         )
         if existing:
             records.append(existing)
             continue
+        activity_date = date.today() - timedelta(days=definition["history_offset_days"] + index * 9)
         record = ActivityRecord(
             child_id=child.id,
             activity_id=activity.id,
             activity_date=activity_date,
             completion_status=completion_status,
             actual_duration_minutes=None if completion_status == "NOT_COMPLETED" else activity.suggested_duration_minutes,
-            child_response=f"演示数据集{set_number}：用于展示“{activity.name}”活动记录流程，不对应真实儿童表现。",
+            child_response=response_marker,
             notes="演示记录，可删除；不用于疾病判断或效果评价。",
             activity_code_snapshot=activity.activity_code,
             activity_name_snapshot=activity.name,
