@@ -1,4 +1,4 @@
-"""写入两套明确标识的演示数据，并对非真人合成视频执行真实分析。"""
+"""写入八套明确标识的演示案例，并对非真人合成视频执行真实分析。"""
 
 from __future__ import annotations
 
@@ -41,6 +41,7 @@ DEMO_SETS = (
         "values": ("OFTEN", "SOMETIMES", "NOT_SEEN_THIS_TIME"),
         "activity_codes": ("ACT-SOC-001", "ACT-COM-001", "ACT-LIF-001"),
         "statuses": ("COMPLETED", "PARTIAL", "COMPLETED"),
+        "history_offset_days": 5,
     },
     {
         "code": "DEMO-CHILD-002",
@@ -52,6 +53,79 @@ DEMO_SETS = (
         "values": ("SOMETIMES", "OFTEN", "UNABLE_TO_JUDGE"),
         "activity_codes": ("ACT-SOC-002", "ACT-ATT-001", "ACT-LIF-002"),
         "statuses": ("PARTIAL", "COMPLETED", "NOT_COMPLETED"),
+        "history_offset_days": 18,
+    },
+    {
+        "code": "DEMO-CHILD-003",
+        "nickname": "演示档案三（非真实儿童）",
+        "birth_month": "2019-08",
+        "gender": "男",
+        "scene": "学习活动",
+        "observer": "教师",
+        "values": ("SOMETIMES", "NOT_SEEN_THIS_TIME", "OFTEN"),
+        "activity_codes": ("ACT-ATT-001", "ACT-COM-002", "ACT-SOC-003"),
+        "statuses": ("COMPLETED", "COMPLETED", "PARTIAL"),
+        "history_offset_days": 32,
+    },
+    {
+        "code": "DEMO-CHILD-004",
+        "nickname": "演示档案四（非真实儿童）",
+        "birth_month": "2022-02",
+        "gender": "女",
+        "scene": "用餐时段",
+        "observer": "家长",
+        "values": ("NOT_OBSERVED", "SOMETIMES", "UNABLE_TO_JUDGE"),
+        "activity_codes": ("ACT-LIF-003", "ACT-ATT-002", "ACT-COM-003"),
+        "statuses": ("PARTIAL", "NOT_COMPLETED", "COMPLETED"),
+        "history_offset_days": 48,
+    },
+    {
+        "code": "DEMO-CHILD-005",
+        "nickname": "演示档案五（非真实儿童）",
+        "birth_month": "2020-12",
+        "gender": "未说明",
+        "scene": "外出活动",
+        "observer": "其他监护人",
+        "values": ("OFTEN", "UNABLE_TO_JUDGE", "SOMETIMES"),
+        "activity_codes": ("ACT-SOC-001", "ACT-ATT-003", "ACT-LIF-002"),
+        "statuses": ("COMPLETED", "PARTIAL", "COMPLETED"),
+        "history_offset_days": 65,
+    },
+    {
+        "code": "DEMO-CHILD-006",
+        "nickname": "演示档案六（非真实儿童）",
+        "birth_month": "2018-06",
+        "gender": "男",
+        "scene": "家庭日常",
+        "observer": "专业人员",
+        "values": ("NOT_SEEN_THIS_TIME", "OFTEN", "SOMETIMES"),
+        "activity_codes": ("ACT-COM-001", "ACT-SOC-002", "ACT-ATT-001"),
+        "statuses": ("PARTIAL", "COMPLETED", "COMPLETED"),
+        "history_offset_days": 82,
+    },
+    {
+        "code": "DEMO-CHILD-007",
+        "nickname": "演示档案七（非真实儿童）",
+        "birth_month": "2021-03",
+        "gender": "女",
+        "scene": "游戏活动",
+        "observer": "教师",
+        "values": ("SOMETIMES", "NOT_OBSERVED", "OFTEN"),
+        "activity_codes": ("ACT-LIF-001", "ACT-COM-003", "ACT-SOC-003"),
+        "statuses": ("NOT_COMPLETED", "PARTIAL", "COMPLETED"),
+        "history_offset_days": 101,
+    },
+    {
+        "code": "DEMO-CHILD-008",
+        "nickname": "演示档案八（非真实儿童）",
+        "birth_month": "2019-01",
+        "gender": "未说明",
+        "scene": "其他",
+        "observer": "其他观察者",
+        "values": ("UNABLE_TO_JUDGE", "SOMETIMES", "NOT_SEEN_THIS_TIME"),
+        "activity_codes": ("ACT-ATT-002", "ACT-LIF-003", "ACT-COM-002"),
+        "statuses": ("COMPLETED", "PARTIAL", "NOT_COMPLETED"),
+        "history_offset_days": 126,
     },
 )
 
@@ -93,7 +167,7 @@ def ensure_child(db, definition: dict) -> Child:
     return child
 
 
-def ensure_video(db, child: Child, set_number: int, temp_dir: Path) -> VideoAnalysis:
+def ensure_video(db, child: Child, set_number: int, temp_dir: Path, history_offset_days: int) -> VideoAnalysis:
     original_name = f"演示数据集{set_number}_非真人合成视频.mp4"
     existing = db.scalar(
         select(VideoAnalysis).where(
@@ -102,7 +176,12 @@ def ensure_video(db, child: Child, set_number: int, temp_dir: Path) -> VideoAnal
             VideoAnalysis.status == "COMPLETED",
         )
     )
+    demo_time = datetime.utcnow() - timedelta(days=history_offset_days)
     if existing:
+        existing.created_at = demo_time
+        existing.started_at = demo_time
+        existing.completed_at = demo_time
+        db.commit()
         return existing
 
     source = temp_dir / f"demo_{set_number}.mp4"
@@ -125,7 +204,8 @@ def ensure_video(db, child: Child, set_number: int, temp_dir: Path) -> VideoAnal
         source_fps=float(metadata["source_fps"]),
         status="RUNNING",
         progress=2,
-        started_at=datetime.utcnow(),
+        created_at=demo_time,
+        started_at=demo_time,
     )
     db.add(record)
     db.commit()
@@ -148,37 +228,45 @@ def ensure_video(db, child: Child, set_number: int, temp_dir: Path) -> VideoAnal
     record.progress = 100
     record.result_json = json.dumps(result, ensure_ascii=False)
     record.result_dir = str(result_dir.resolve())
-    record.completed_at = datetime.utcnow()
+    record.completed_at = demo_time
     db.commit()
     db.refresh(record)
     return record
 
 
-def ensure_observation(db, child: Child, video: VideoAnalysis, definition: dict, set_number: int) -> ObservationRecord:
-    marker = f"演示数据集{set_number}：本记录仅用于界面和流程展示，不代表真实儿童观察结论。"
-    existing = db.scalar(
-        select(ObservationRecord).where(
-            ObservationRecord.child_id == child.id,
-            ObservationRecord.summary_notes == marker,
-        )
-    )
-    if existing:
-        return existing
+def ensure_observations(db, child: Child, video: VideoAnalysis, definition: dict, set_number: int) -> list[ObservationRecord]:
+    records = []
     options = definition["values"]
-    observation_data = {key: options[index % len(options)] for index, key in enumerate(ITEMS)}
-    record = ObservationRecord(
-        child_id=child.id,
-        video_analysis_id=video.id,
-        observation_date=date.today() - timedelta(days=6 - set_number),
-        observation_scene=definition["scene"],
-        observer_role=definition["observer"],
-        observation_data=json.dumps(observation_data, ensure_ascii=False, sort_keys=True),
-        summary_notes=marker,
-    )
-    db.add(record)
-    db.commit()
-    db.refresh(record)
-    return record
+    for record_number in (1, 2):
+        marker = f"演示案例{set_number}-观察{record_number}：非真实儿童数据。"
+        existing = db.scalar(
+            select(ObservationRecord).where(
+                ObservationRecord.child_id == child.id,
+                ObservationRecord.summary_notes == marker,
+            )
+        )
+        if existing:
+            records.append(existing)
+            continue
+        observation_data = {
+            key: options[(index + record_number - 1) % len(options)] for index, key in enumerate(ITEMS)
+        }
+        record = ObservationRecord(
+            child_id=child.id,
+            video_analysis_id=video.id if record_number == 1 else None,
+            observation_date=date.today() - timedelta(
+                days=definition["history_offset_days"] + (record_number - 1) * 14
+            ),
+            observation_scene=definition["scene"],
+            observer_role=definition["observer"],
+            observation_data=json.dumps(observation_data, ensure_ascii=False, sort_keys=True),
+            summary_notes=marker,
+        )
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+        records.append(record)
+    return records
 
 
 def ensure_activity_records(db, child: Child, definition: dict, set_number: int) -> list[ActivityRecord]:
@@ -187,7 +275,7 @@ def ensure_activity_records(db, child: Child, definition: dict, set_number: int)
         activity = db.scalar(select(Activity).where(Activity.activity_code == code))
         if not activity:
             raise RuntimeError(f"缺少内置活动：{code}")
-        activity_date = date.today() - timedelta(days=(index + 1) * 2 + set_number)
+        activity_date = date.today() - timedelta(days=definition["history_offset_days"] + index * 9)
         existing = db.scalar(
             select(ActivityRecord).where(
                 ActivityRecord.child_id == child.id,
@@ -229,8 +317,8 @@ def main() -> None:
         temp_dir = Path(temp_name)
         for set_number, definition in enumerate(DEMO_SETS, start=1):
             child = ensure_child(db, definition)
-            video = ensure_video(db, child, set_number, temp_dir)
-            observation = ensure_observation(db, child, video, definition, set_number)
+            video = ensure_video(db, child, set_number, temp_dir, definition["history_offset_days"])
+            observations = ensure_observations(db, child, video, definition, set_number)
             activities = ensure_activity_records(db, child, definition, set_number)
             summary.append(
                 {
@@ -238,7 +326,7 @@ def main() -> None:
                     "child_code": child.child_code,
                     "video_id": video.id,
                     "video_status": video.status,
-                    "observation_id": observation.id,
+                    "observation_records": len(observations),
                     "activity_records": len(activities),
                 }
             )

@@ -158,8 +158,11 @@ npm --prefix frontend run build
 # 使用自备且已授权的实际 MP4 验证真实推理，不写业务数据库
 .venv\Scripts\python.exe scripts\verify_actual_analysis.py "D:\path\authorized-video.mp4"
 
-# 在临时数据库中验证从管理员初始化到综合报告的完整流程
-.venv\Scripts\python.exe scripts\verify_stage6_flow.py "D:\path\authorized-video.mp4"
+# 写入 8 套明确标注为非真实儿童的完整演示案例（可重复执行）
+.venv\Scripts\python.exe scripts\seed_demo_data.py
+
+# 在临时数据库中连续验证 5 次从登录到综合报告的完整流程
+.venv\Scripts\python.exe scripts\verify_stage6_flow.py "D:\path\authorized-video.mp4" --runs 5
 ```
 
 自动化测试中的队列推理会使用可控替身来稳定覆盖状态机；`check_models.py` 与 `verify_actual_analysis.py` 则明确执行真实 MediaPipe 模型，二者不会混为一谈。
